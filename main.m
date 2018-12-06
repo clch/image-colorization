@@ -12,7 +12,7 @@ if size(targetImg,3) == 1
     target = repmat(target(:,:,1), [1 1 3]);
 end
 
-source = rgb2ycbcr(sourceImg)
-target = rgb2ycbcr(targetImg)
+source = rgb2ycbcr(sourceImg);
+target = rgb2ycbcr(targetImg);
 
 
