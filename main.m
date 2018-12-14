@@ -1,14 +1,14 @@
 % variables
 image_num = 4;
-num_swatches = 2;
+num_swatches = 3;
 
-patch_size = 3;
+patch_size = 5;
 grid_size = 5; % odd number
 mean_weight = 0.5;
 
 % loading / preprocessing
-source_name = ['source' int2str(image_num) '.jpg'];
-target_name = ['target' int2str(image_num) '.jpg'];
+source_name = ['images/source' int2str(image_num) '.jpg'];
+target_name = ['images/target' int2str(image_num) '.jpg'];
 source_img = im2double(imread(source_name));
 target_img = im2double(imread(target_name));
 
@@ -19,10 +19,10 @@ end
 source = rgb2ycbcr(source_img);
 target = rgb2ycbcr(target_img);
 
-% getting swatches
 box_s = zeros(num_swatches, 4);
 box_t = zeros(num_swatches, 4);
 for i = 1:num_swatches
+    % getting swatches
     imshow(source_img);
     rect = getrect; % x, y, width, height
     box_s(i, 1) = uint16(rect(1));
@@ -48,6 +48,7 @@ for i = 1:num_swatches
     swatch_t(:,:,1) = (swatch_t(:,:,1)-mean_t).*sigma_t./sigma_s+mean_s;
     luminance_t = target(:,:,1);
     
+    % jittered grid
     height = box_s(i,4) - box_s(i,2);
     width = box_s(i,3) - box_s(i,1);
     height_grid_num = floor(height / grid_size)-1;
@@ -74,6 +75,7 @@ for i = 1:num_swatches
         end
     end
     
+    % coloring swatches
     height = box_t(i,4) - box_t(i,2);
     width = box_t(i,3) - box_t(i,1);
     for y = 1:height
@@ -99,15 +101,48 @@ for i = 1:num_swatches
             end
         end
     end
-    target(box_t(i,2):box_t(i,4),box_t(i,1):box_t(i,3),:) = swatch_t;
+    target(box_t(i,2):box_t(i,4),box_t(i,1):box_t(i,3),2)=swatch_t(:,:,2);
+    target(box_t(i,2):box_t(i,4),box_t(i,1):box_t(i,3),3)=swatch_t(:,:,3);
 end
 
-
+% matching whole image
+tic;
+width = size(target,2);
+height = size(target, 1);
+margin = (patch_size-1)/2;
+for y = 1:height
+    for x = 1:width
+        x_min = max(1, x - margin);
+        y_min = max(1, y - margin);
+        x_max = min(width, x + margin);
+        y_max = min(height, y + margin);
+        min_error = -1;
+        min_r = 0;
+        min_c = 0;
+        target_n = luminance_t(y_min:y_max, x_min:x_max);
+        for i = 1:num_swatches
+            for r = box_t(i,2):patch_size:box_t(i,4)
+                for c = box_t(i,1):patch_size:box_t(i,3)
+                    swatch_n = luminance_t(y_min+r-y:y_max+r-y,x_min+c-x:x_max+c-x);
+                    error = sum((target_n(:) - swatch_n(:)).^2);
+                    if error < min_error || min_error < 0
+                        min_error = error;
+                        min_r = r;
+                        min_c = c;
+                    end
+                end
+            end
+        end
+        target(y,x,2) = target(min_r,min_c,2);
+        target(y,x,3) = target(min_r,min_c,3);
+    end
+end
+toc;
+            
 % postprocessing
 target = ycbcr2rgb(target);
 imshow(target);
-imwrite(target, ['result' int2str(image_num) '.jpg']);
-
+imwrite(target, ['images/result' int2str(image_num) '.jpg']);
 
 
 
